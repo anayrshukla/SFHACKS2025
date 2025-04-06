@@ -13,9 +13,11 @@ const SchedulePage = () => {
         const data = await res.json();
         if (data.success) {
           setSchedule(data.schedule);
+          localStorage.setItem('patientSchedule', data.schedule);
         } else {
           setSchedule('Failed to load schedule.');
         }
+        
       } catch (error) {
         console.error('Error fetching schedule:', error);
         setSchedule('Server error while loading schedule.');
