@@ -108,7 +108,19 @@ app.post('/api/chat', async (req, res) => {
     }
 
     const model = gemini.getGenerativeModel({ model: "gemini-1.5-pro" });
-    const result = await model.generateContent(prompt);
+
+    // Define personality
+    const personalityPrompt = `
+    You are a friendly and empathetic medical assistant named CareBot.
+    You speak with warmth and clarity. Be concise but kind.
+    If someone asks about a medical issue, offer basic advice and encourage them to see a doctor.
+    Don't use technical jargon unless asked to explain it.
+    `;
+
+    // Combine system prompt and user input
+    const fullPrompt = `${personalityPrompt}\n\nUser: ${prompt}\nCareBot:`;
+
+    const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const text = response.text();
 
@@ -118,6 +130,7 @@ app.post('/api/chat', async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
 
 // Health check
 app.get('/', (req, res) => {
