@@ -5,6 +5,7 @@ import { auth } from './firebase/config';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import PatientOnboarding from './pages/onboarding/PatientOnboarding';
+import Dashboard from './pages/dashboard/Dashboard'; 
 
 function App() {
   const [user, setUser] = useState(null);
@@ -38,7 +39,7 @@ function App() {
         />
         <Route 
           path="/dashboard" 
-          element={user ? <div>Dashboard (Coming Soon)</div> : <Navigate to="/login" />} 
+          element={user ? <Dashboard /> : <Navigate to="/login" />} 
         />
       </Routes>
     </Router>
