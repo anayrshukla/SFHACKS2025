@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 require('dotenv').config();
 
@@ -9,7 +9,7 @@ const port = process.env.PORT || 5001;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:3004', 'http://localhost:3005'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -18,11 +18,8 @@ app.use(express.json({ limit: '10mb' }));
 // MongoDB connection
 const uri = "mongodb+srv://anaytest2:sfhacks@recovai.xvktxbr.mongodb.net/?retryWrites=true&w=majority&appName=RecovAI";
 const client = new MongoClient(uri);
-
-// Gemini API setup
 const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Connect to MongoDB
 async function connectToMongoDB() {
   try {
     await client.connect();
@@ -33,78 +30,73 @@ async function connectToMongoDB() {
 }
 connectToMongoDB();
 
-// Save patient data
+// Save patient and schedule
 app.post('/api/patients', async (req, res) => {
   try {
-    console.log('\n=== Raw Request ===');
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
-
     const database = client.db("RecovAI");
     const collection = database.collection("patients_data");
 
-    if (!req.body || Object.keys(req.body).length === 0) {
-      console.log('Error: Empty request body');
-      return res.status(400).json({
-        success: false,
-        error: 'Request body is empty or not properly formatted'
-      });
-    }
-
-    console.log('\n=== Raw Request Body ===');
-    console.log(JSON.stringify(req.body, null, 2));
-
     const patientData = {
-      personalInfo: {
-        name: req.body.personalInfo?.name || '',
-        address: req.body.personalInfo?.address || '',
-        dob: req.body.personalInfo?.dob || '',
-        contactNumber: req.body.personalInfo?.contactNumber || ''
-      },
-      emergencyContacts: Array.isArray(req.body.emergencyContacts) ? req.body.emergencyContacts : [],
-      medicalInfo: {
-        medications: Array.isArray(req.body.medicalInfo?.medications) ? req.body.medicalInfo.medications : [],
-        conditions: req.body.medicalInfo?.conditions || '',
-        surgeryType: req.body.medicalInfo?.surgeryType || ''
-      },
-      doctorInfo: {
-        contact: req.body.doctorInfo?.contact || '',
-        email: req.body.doctorInfo?.email || ''
-      },
-      routineInfo: {
-        sleepSchedule: req.body.routineInfo?.sleepSchedule || '',
-        dietPreferences: req.body.routineInfo?.dietPreferences || '',
-        allergies: req.body.routineInfo?.allergies || ''
-      },
+      personalInfo: req.body.personalInfo || {},
+      emergencyContacts: req.body.emergencyContacts || [],
+      medicalInfo: req.body.medicalInfo || {},
+      doctorInfo: req.body.doctorInfo || {},
+      routineInfo: req.body.routineInfo || {},
       createdAt: new Date()
     };
 
-    console.log('\n=== Processed Patient Data ===');
-    console.log(JSON.stringify(patientData, null, 2));
+    const model = gemini.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const schedulePrompt = `
+You are a kind and professional medical assistant named Aurora. Based on the following patient data,
+please generate a personalized daily schedule in Markdown table format. Prioritize medication timings,
+meals, rest, and wellness activities. Respond ONLY with a table.
 
-    const result = await collection.insertOne(patientData);
-    console.log('\n=== MongoDB Insert Result ===');
-    console.log(JSON.stringify(result, null, 2));
-    console.log('Inserted document with ID:', result.insertedId);
+Patient Info:
+${JSON.stringify(patientData, null, 2)}
+    `;
+    const result = await model.generateContent(schedulePrompt);
+    const response = await result.response;
+    const scheduleText = response.text();
 
-    res.status(201).json({ 
-      success: true, 
-      message: 'Patient data saved successfully',
-      data: { insertedId: result.insertedId.toString() }
+    patientData.generatedSchedule = scheduleText;
+
+    const insertResult = await collection.insertOne(patientData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Patient and schedule saved successfully',
+      data: { insertedId: insertResult.insertedId.toString() }
     });
   } catch (error) {
-    console.error('\n=== Error Saving Patient Data ===');
-    console.error(error);
+    console.error('Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Gemini chatbot route
+// Get schedule by patient ID
+app.get('/api/schedule/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const database = client.db("RecovAI");
+    const collection = database.collection("patients_data");
+
+    const patient = await collection.findOne({ _id: new ObjectId(patientId) });
+    if (!patient) return res.status(404).json({ success: false, error: 'Patient not found' });
+
+    res.json({ success: true, schedule: patient.generatedSchedule });
+  } catch (error) {
+    console.error('Error fetching schedule:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 🔥 NEW: Chat endpoint for Gemini chatbot
 app.post('/api/chat', async (req, res) => {
   try {
     const { prompt } = req.body;
-    if (!prompt) {
-      return res.status(400).json({ success: false, error: 'Prompt is required.' });
+
+    if (!prompt || prompt.trim() === '') {
+      return res.status(400).json({ success: false, error: 'Prompt is required' });
     }
 
     const model = gemini.getGenerativeModel({ model: "gemini-1.5-pro" });
@@ -126,7 +118,7 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ success: true, response: text });
   } catch (error) {
-    console.error('Gemini Chat Error:', error);
+    console.error('Chat error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -137,12 +129,6 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Test route
-app.get('/api/test', (req, res) => {
-  res.json({ status: 'success', message: 'API is working', timestamp: new Date() });
-});
-
-// Start server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

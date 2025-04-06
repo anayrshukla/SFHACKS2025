@@ -5,7 +5,8 @@ import { auth } from './firebase/config';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/auth/LoginPage';
 import PatientOnboarding from './pages/onboarding/PatientOnboarding';
-import Dashboard from './pages/dashboard/Dashboard'; 
+import Dashboard from './pages/dashboard/Dashboard';
+import SchedulePage from './pages/schedule/SchedulePage';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -35,11 +36,15 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route 
           path="/onboarding" 
-          element={user ? <PatientOnboarding /> : <Navigate to="/login" />} 
+          element={user ? <PatientOnboarding setPatientId={(id) => localStorage.setItem('patientId', id)} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/dashboard" 
           element={user ? <Dashboard /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/schedule/:patientId" 
+          element={user ? <SchedulePage /> : <Navigate to="/login" />} 
         />
       </Routes>
     </Router>

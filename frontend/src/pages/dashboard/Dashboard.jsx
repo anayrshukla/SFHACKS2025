@@ -53,6 +53,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex gap-8">
+          {/* Left Section - Dashboard Info */}
           <div className="flex-1">
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
               <div className="bg-blue-600 text-white px-6 py-4">
@@ -82,6 +83,19 @@ const Dashboard = () => {
                     >
                       Update Information
                     </button>
+                    <button 
+                      className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                      onClick={() => {
+                        const patientId = localStorage.getItem('patientId');
+                        if (patientId) {
+                          navigate(`/schedule/${patientId}`);
+                        } else {
+                          alert('No patient ID found.');
+                        }
+                      }}
+                    >
+                      View Your Daily Schedule
+                    </button>
                   </div>
                 </div>
 
@@ -99,7 +113,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Chat section moved to the right */}
+          {/* Right Section - Chat Assistant */}
           <div className="w-1/3">
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
               <h2 className="text-xl font-bold text-gray-900 p-4 border-b">Recovery Chat Assistant</h2>
